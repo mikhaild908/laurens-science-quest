@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070b16">
+    <title>Orbit — Earth, Moon & Sun</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #070b16;
+            color: #eef3ff;
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
+            --muted: #8d9ab4;
+            --line: rgba(159, 181, 224, .15);
+            --panel: rgba(13, 20, 37, .82);
+            --cyan: #7ee7f5;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+
+        body {
+            background:
+                radial-gradient(ellipse at 68% 48%, rgba(27, 46, 83, .25), transparent 49%),
+                #070b16;
+        }
+
+        #scene {
+            position: fixed;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            outline: none;
+        }
+
+        .veil {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(90deg, rgba(7, 11, 22, .76) 0%, rgba(7, 11, 22, .38) 31%, transparent 58%),
+                linear-gradient(0deg, rgba(7, 11, 22, .58), transparent 30%);
+        }
+
+        .layout {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            padding: clamp(18px, 4vw, 58px);
+            pointer-events: none;
+        }
+
+        .panel {
+            width: min(360px, 100%);
+            padding: 27px 26px 23px;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: var(--panel);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .34), inset 0 1px rgba(255,255,255,.035);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            pointer-events: auto;
+        }
+
+        .eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin: 0 0 17px;
+            color: var(--cyan);
+            font-size: 10px;
+            font-weight: 750;
+            letter-spacing: .19em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: 0 0 13px rgba(126, 231, 245, .8);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(27px, 3vw, 35px);
+            font-weight: 580;
+            letter-spacing: -.055em;
+            line-height: 1.06;
+        }
+
+        .intro {
+            max-width: 290px;
+            margin: 12px 0 22px;
+            color: #a4afc4;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .readouts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .readout {
+            min-width: 0;
+            padding: 12px 13px 11px;
+            border: 1px solid rgba(159, 181, 224, .11);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .027);
+        }
+
+        .readout-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+
+        .readout-value {
+            display: block;
+            overflow: hidden;
+            color: #f3f6ff;
+            font-variant-numeric: tabular-nums;
+            font-size: 15px;
+            font-weight: 550;
+            letter-spacing: -.025em;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .readout-value small {
+            color: #9aa8c0;
+            font-size: 11px;
+            font-weight: 450;
+            letter-spacing: 0;
+        }
+
+        .season-card {
+            margin: -10px 0 20px;
+            padding: 13px 14px;
+            border: 1px solid rgba(126, 231, 245, .17);
+            border-radius: 12px;
+            background: linear-gradient(110deg, rgba(126, 231, 245, .085), rgba(255, 255, 255, .025));
+        }
+
+        .season-heading {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .season-name {
+            color: #f0f5ff;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .season-hemisphere {
+            color: var(--cyan);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .11em;
+            text-transform: uppercase;
+        }
+
+        .season-effect {
+            margin: 6px 0 0;
+            color: #a4afc4;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .control-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #d7deee;
+            font-size: 12px;
+            font-weight: 550;
+        }
+
+        #speed-value {
+            color: var(--cyan);
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            display: block;
+            width: 100%;
+            height: 4px;
+            margin: 0;
+            border-radius: 99px;
+            accent-color: var(--cyan);
+            cursor: pointer;
+        }
+
+        .range-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 7px;
+            color: #74819a;
+            font-size: 10px;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 44px 44px;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        button {
+            min-height: 42px;
+            border: 1px solid rgba(159, 181, 224, .2);
+            border-radius: 11px;
+            background: rgba(255, 255, 255, .045);
+            color: #e9efff;
+            font: inherit;
+            cursor: pointer;
+            transition: background .18s ease, border-color .18s ease, transform .18s ease;
+        }
+
+        button:hover {
+            border-color: rgba(126, 231, 245, .55);
+            background: rgba(126, 231, 245, .1);
+        }
+
+        button:active { transform: scale(.98); }
+        button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+        #play-button {
+            border-color: rgba(126, 231, 245, .36);
+            background: rgba(126, 231, 245, .11);
+            font-size: 12px;
+            font-weight: 650;
+        }
+
+        .icon-button { display: grid; place-items: center; padding: 0; }
+        .icon-button svg { width: 16px; height: 16px; }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-top: 21px;
+            padding-top: 16px;
+            border-top: 1px solid var(--line);
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #9ba8bf;
+            font-size: 10px;
+        }
+
+        .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+        .legend-dot.sun { background: #ffc96a; box-shadow: 0 0 8px #ffc96a; }
+        .legend-dot.earth { background: #62c6ed; }
+        .legend-dot.moon { background: #d6deed; }
+
+        .hint {
+            position: fixed;
+            right: clamp(18px, 4vw, 58px);
+            bottom: 28px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(200, 213, 237, .65);
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        .hint svg { width: 15px; height: 15px; opacity: .8; }
+
+        .direction {
+            position: fixed;
+            top: 28px;
+            right: clamp(18px, 4vw, 58px);
+            padding: 9px 12px;
+            border: 1px solid var(--line);
+            border-radius: 99px;
+            background: rgba(13, 20, 37, .62);
+            color: #b7c5dd;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .13em;
+            pointer-events: none;
+        }
+
+        #error-message {
+            position: fixed;
+            inset: auto 20px 20px;
+            display: none;
+            max-width: 560px;
+            margin: auto;
+            padding: 14px 16px;
+            border: 1px solid rgba(255, 150, 150, .4);
+            border-radius: 12px;
+            background: rgba(58, 20, 28, .94);
+            color: #ffe4e4;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 700px) {
+            .layout { align-items: flex-end; padding: 16px; }
+            .panel { width: min(100%, 390px); padding: 20px; }
+            .intro { margin: 9px 0 13px; }
+            .readouts { margin-bottom: 13px; }
+            .season-card { margin: -5px 0 13px; padding: 10px 12px; }
+            .buttons { margin-top: 16px; }
+            .legend { margin-top: 15px; padding-top: 13px; }
+            .hint { right: 18px; bottom: auto; top: 58px; }
+            .direction { top: 18px; right: 16px; }
+            .veil { background: linear-gradient(0deg, rgba(7, 11, 22, .94), rgba(7, 11, 22, .55) 54%, transparent 100%); }
+        }
+
+        @media (max-height: 680px) and (min-width: 701px) {
+            .panel { padding: 19px 21px 17px; }
+            .intro { margin: 8px 0 12px; }
+            .readouts { margin-bottom: 12px; }
+            .season-card { margin: -5px 0 12px; padding: 10px 12px; }
+            .buttons { margin-top: 14px; }
+            .legend { margin-top: 14px; padding-top: 12px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="scene" role="img" aria-label="Animated 3D simulation of Earth orbiting the Sun and the Moon orbiting Earth"></canvas>
+    <div class="veil" aria-hidden="true"></div>
+    <main class="layout">
+        <section class="panel" aria-labelledby="page-title">
+            <p class="eyebrow">Celestial mechanics · 3D model</p>
+            <h1 id="page-title">Earth, Moon<br>&amp; Sun</h1>
+            <p class="intro">Watch Earth travel around the Sun as the Moon traces its orbit. Follow how Earth’s axial tilt changes the seasons.</p>
+
+            <div class="readouts" aria-live="off">
+                <div class="readout">
+                    <span class="readout-label">Earth year</span>
+                    <span class="readout-value" id="day-readout">Day 001</span>
+                </div>
+                <div class="readout">
+                    <span class="readout-label">Moon phase</span>
+                    <span class="readout-value" id="phase-readout">New moon</span>
+                </div>
+            </div>
+            <div class="season-card" aria-live="polite">
+                <div class="season-heading">
+                    <span class="season-name" id="season-name">Northern summer</span>
+                    <span class="season-hemisphere">Northern hemisphere</span>
+                </div>
+                <p class="season-effect" id="season-effect">The north tilts toward the Sun, bringing longer days and more direct sunlight.</p>
+            </div>
+
+            <div class="control-heading">
+                <label for="speed-slider">Simulation speed</label>
+                <span id="speed-value">1.0×</span>
+            </div>
+            <input id="speed-slider" type="range" min="0.25" max="3" step="0.25" value="1" aria-label="Simulation speed">
+            <div class="range-labels" aria-hidden="true"><span>0.25×</span><span>3×</span></div>
+
+            <div class="buttons">
+                <button id="play-button" type="button" aria-pressed="false">Pause simulation</button>
+                <button id="reset-button" class="icon-button" type="button" aria-label="Reset simulation" title="Reset simulation">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 10a7.5 7.5 0 1 1 .8 5.2M4.5 4.5v5.8h5.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button id="view-button" class="icon-button" type="button" aria-label="Return to north-pole view" title="North-pole view">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M12 4v4m0-4 2.2 2.2M12 4 9.8 6.2M5.5 8.5 8 10m10.5-1.5L16 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+
+            <div class="legend" aria-label="Celestial body legend">
+                <span class="legend-item"><span class="legend-dot sun"></span>Sun</span>
+                <span class="legend-item"><span class="legend-dot earth"></span>Earth · 23.4° tilt</span>
+                <span class="legend-item"><span class="legend-dot moon"></span>Moon</span>
+            </div>
+        </section>
+    </main>
+    <div class="hint" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M8 11V6a1.5 1.5 0 0 1 3 0v4-5a1.5 1.5 0 0 1 3 0v5-4a1.5 1.5 0 0 1 3 0v6l1-1a1.5 1.5 0 0 1 2.5 1.2l-.8 4.3A5.5 5.5 0 0 1 14.3 21h-2.1a5.5 5.5 0 0 1-4.1-1.8L4.5 15a1.7 1.7 0 0 1 2.4-2.4L8 13.7V11Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Drag to rotate · Scroll to zoom
+    </div>
+    <div class="direction" aria-hidden="true">NORTH POLE · CCW</div>
+    <div id="error-message" role="alert"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+        const canvas = document.querySelector("#scene");
+        const errorMessage = document.querySelector("#error-message");
+
+        try {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070b16);
+
+            const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+            camera.up.set(0, 0, -1);
+
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.25;
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.055;
+            controls.minDistance = 11;
+            controls.maxDistance = 52;
+            controls.minPolarAngle = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.04;
+            let compactView = window.innerWidth <= 700;
+
+            function setDefaultView() {
+                compactView = window.innerWidth <= 700;
+                const viewTargetX = compactView ? -3.2 : -5.4;
+                camera.fov = compactView ? 60 : 52;
+                camera.position.set(viewTargetX, compactView ? 35 : 34, compactView ? 5 : 12);
+                camera.updateProjectionMatrix();
+                controls.target.set(viewTargetX, compactView ? 5 : 0, 0);
+                controls.update();
+            }
+
+            setDefaultView();
+
+            scene.add(new THREE.AmbientLight(0x8293c2, 0.7));
+
+            const sunLight = new THREE.PointLight(0xffdfad, 520, 0, 2);
+            scene.add(sunLight);
+
+            const sun = new THREE.Mesh(
+                new THREE.SphereGeometry(0.86, 48, 32),
+                new THREE.MeshBasicMaterial({ color: 0xffc66d })
+            );
+            scene.add(sun);
+
+            const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: createGlowTexture(),
+                color: 0xffa64a,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            sunGlow.scale.set(6.7, 6.7, 1);
+            scene.add(sunGlow);
+
+            const earthOrbitRadius = 7.2;
+            const earthRadius = 0.53;
+            const moonOrbitRadius = 1.48;
+            const tiltRadians = THREE.MathUtils.degToRad(23.44);
+            const earthYearSeconds = 84;
+            const moonMonthSeconds = earthYearSeconds / 13.37;
+
+            scene.add(makeOrbit(earthOrbitRadius, 0x7487aa, 0.37, 360));
+            const seasonMarkers = [
+                { label: "JUN SOLSTICE", date: "≈ JUN 21", angle: 0, color: 0xffc66d },
+                { label: "SEP EQUINOX", date: "≈ SEP 22", angle: Math.PI / 2, color: 0x7ee7f5 },
+                { label: "DEC SOLSTICE", date: "≈ DEC 21", angle: Math.PI, color: 0x9caeff },
+                { label: "MAR EQUINOX", date: "≈ MAR 20", angle: Math.PI * 1.5, color: 0x7ee7f5 }
+            ];
+            seasonMarkers.forEach(addSeasonMarker);
+
+            const earthOrbit = new THREE.Group();
+            scene.add(earthOrbit);
+
+            const earthSystem = new THREE.Group();
+            earthSystem.position.x = earthOrbitRadius;
+            earthOrbit.add(earthSystem);
+
+            const earthTilt = new THREE.Group();
+            earthTilt.rotation.z = tiltRadians;
+            earthSystem.add(earthTilt);
+
+            const earth = new THREE.Mesh(
+                new THREE.SphereGeometry(earthRadius, 64, 48),
+                new THREE.MeshStandardMaterial({
+                    map: createEarthTexture(),
+                    roughness: 0.82,
+                    metalness: 0.02
+                })
+            );
+            earthTilt.add(earth);
+
+            const axisPoints = [
+                new THREE.Vector3(0, -1.02, 0),
+                new THREE.Vector3(0, 1.02, 0)
+            ];
+            const axis = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints(axisPoints),
+                new THREE.LineBasicMaterial({ color: 0x88e9f4, transparent: true, opacity: 0.78 })
+            );
+            earthTilt.add(axis);
+
+            const northPole = new THREE.Mesh(
+                new THREE.SphereGeometry(0.045, 12, 10),
+                new THREE.MeshBasicMaterial({ color: 0x9df6ff })
+            );
+            northPole.position.y = 1.02;
+            earthTilt.add(northPole);
+
+            const moonOrbit = new THREE.Group();
+            earthSystem.add(moonOrbit);
+            moonOrbit.add(makeOrbit(moonOrbitRadius, 0xa5b3cd, 0.32, 180));
+
+            const moon = new THREE.Mesh(
+                new THREE.SphereGeometry(0.19, 32, 24),
+                new THREE.MeshStandardMaterial({
+                    color: 0xcbd4e4,
+                    roughness: 0.94,
+                    metalness: 0
+                })
+            );
+            moon.position.x = moonOrbitRadius;
+            moonOrbit.add(moon);
+
+            addStars();
+
+            const speedSlider = document.querySelector("#speed-slider");
+            const speedValue = document.querySelector("#speed-value");
+            const playButton = document.querySelector("#play-button");
+            const dayReadout = document.querySelector("#day-readout");
+            const phaseReadout = document.querySelector("#phase-readout");
+            const seasonName = document.querySelector("#season-name");
+            const seasonEffect = document.querySelector("#season-effect");
+            const seasons = [
+                {
+                    name: "Northern summer",
+                    effect: "The north tilts toward the Sun, bringing longer days and more direct sunlight."
+                },
+                {
+                    name: "Northern autumn",
+                    effect: "The Sun crosses the equator; day and night are nearly equal as daylight shortens."
+                },
+                {
+                    name: "Northern winter",
+                    effect: "The north tilts away from the Sun, bringing shorter days and less direct sunlight."
+                },
+                {
+                    name: "Northern spring",
+                    effect: "The Sun crosses the equator; day and night are nearly equal as daylight grows."
+                }
+            ];
+            let running = true;
+            let speed = Number(speedSlider.value);
+            let elapsed = 0;
+            let lastTime = 0;
+
+            speedSlider.addEventListener("input", () => {
+                speed = Number(speedSlider.value);
+                speedValue.textContent = `${speed.toFixed(2).replace(/0$/, "").replace(/\.$/, "")}×`;
+            });
+
+            playButton.addEventListener("click", () => {
+                running = !running;
+                playButton.textContent = running ? "Pause simulation" : "Resume simulation";
+                playButton.setAttribute("aria-pressed", String(!running));
+            });
+
+            document.querySelector("#reset-button").addEventListener("click", () => {
+                elapsed = 0;
+                earthOrbit.rotation.y = 0;
+                moonOrbit.rotation.y = 0;
+                earthTilt.rotation.y = 0;
+                earth.rotation.y = 0;
+                updateReadouts();
+            });
+
+            document.querySelector("#view-button").addEventListener("click", () => {
+                setDefaultView();
+            });
+
+            function updateReadouts() {
+                const day = Math.floor((elapsed / earthYearSeconds) * 365.25) + 1;
+                dayReadout.textContent = `Day ${String(day).padStart(3, "0")}`;
+                const moonPhaseAngle = THREE.MathUtils.euclideanModulo(
+                    moonOrbit.rotation.y - earthOrbit.rotation.y + Math.PI,
+                    Math.PI * 2
+                );
+                const phase = Math.round(moonPhaseAngle / (Math.PI * 2) * 8) % 8;
+                const phases = [
+                    "New moon", "Waxing crescent", "First quarter", "Waxing gibbous",
+                    "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"
+                ];
+                phaseReadout.textContent = phases[phase];
+                const seasonIndex = Math.floor(
+                    THREE.MathUtils.euclideanModulo(earthOrbit.rotation.y, Math.PI * 2) / (Math.PI / 2)
+                );
+                seasonName.textContent = seasons[seasonIndex].name;
+                seasonEffect.textContent = seasons[seasonIndex].effect;
+            }
+
+            function resize() {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                if ((width <= 700) !== compactView) setDefaultView();
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height, false);
+            }
+
+            window.addEventListener("resize", resize);
+            resize();
+
+            renderer.setAnimationLoop((time) => {
+                const delta = lastTime === 0 ? 0 : Math.min((time - lastTime) / 1000, 0.05);
+                lastTime = time;
+
+                if (running) {
+                    elapsed += delta * speed;
+                    // Positive Y rotation is counter-clockwise when viewed from north (+Y).
+                    earthOrbit.rotation.y = (elapsed / earthYearSeconds) * Math.PI * 2;
+                    moonOrbit.rotation.y = (elapsed / moonMonthSeconds) * Math.PI * 2;
+                    // Counter-rotate the body frame so the axial tilt stays fixed in space.
+                    earthTilt.rotation.y = -earthOrbit.rotation.y;
+                    earth.rotation.y = elapsed * 0.7;
+                    updateReadouts();
+                }
+
+                controls.update();
+                renderer.render(scene, camera);
+            });
+
+            function makeOrbit(radius, color, opacity, segments) {
+                const points = [];
+                for (let i = 0; i <= segments; i++) {
+                    const angle = (i / segments) * Math.PI * 2;
+                    points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+                }
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity,
+                    depthWrite: false
+                }));
+            }
+
+            function addSeasonMarker(marker) {
+                const markerPosition = new THREE.Vector3(
+                    Math.cos(marker.angle) * earthOrbitRadius,
+                    0.08,
+                    -Math.sin(marker.angle) * earthOrbitRadius
+                );
+                const dot = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.13, 20, 16),
+                    new THREE.MeshBasicMaterial({ color: marker.color })
+                );
+                dot.position.copy(markerPosition);
+                scene.add(dot);
+
+                const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: createGlowTexture(),
+                    color: marker.color,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                }));
+                glow.position.copy(markerPosition);
+                glow.scale.set(0.72, 0.72, 1);
+                scene.add(glow);
+
+                const label = createSeasonLabel(marker);
+                const radial = new THREE.Vector3(Math.cos(marker.angle), 0, -Math.sin(marker.angle));
+                const pointsTowardEdge = Math.abs(Math.cos(marker.angle)) > 0.5;
+                label.position.copy(markerPosition).addScaledVector(radial, pointsTowardEdge ? -2.8 : 1.1);
+                label.position.y = 0.18;
+                scene.add(label);
+            }
+
+            function createSeasonLabel(marker) {
+                const labelCanvas = document.createElement("canvas");
+                labelCanvas.width = 512;
+                labelCanvas.height = 112;
+                const context = labelCanvas.getContext("2d");
+                context.fillStyle = "rgba(10, 17, 31, .88)";
+                context.beginPath();
+                context.roundRect(2, 2, 508, 108, 24);
+                context.fill();
+                context.strokeStyle = `#${marker.color.toString(16).padStart(6, "0")}88`;
+                context.lineWidth = 3;
+                context.stroke();
+                context.fillStyle = `#${marker.color.toString(16).padStart(6, "0")}`;
+                context.font = "700 46px system-ui, sans-serif";
+                context.textAlign = "center";
+                context.textBaseline = "middle";
+                context.fillText(marker.label, 256, 39);
+                context.fillStyle = "#b8c5dc";
+                context.font = "500 34px system-ui, sans-serif";
+                context.fillText(marker.date, 256, 78);
+
+                const texture = new THREE.CanvasTexture(labelCanvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: texture,
+                    transparent: true,
+                    depthWrite: false
+                }));
+                sprite.scale.set(3.4, 0.74, 1);
+                return sprite;
+            }
+
+            function createEarthTexture() {
+                const textureCanvas = document.createElement("canvas");
+                textureCanvas.width = 1024;
+                textureCanvas.height = 512;
+                const context = textureCanvas.getContext("2d");
+                const ocean = context.createLinearGradient(0, 0, 0, 512);
+                ocean.addColorStop(0, "#12608b");
+                ocean.addColorStop(0.48, "#1386ad");
+                ocean.addColorStop(1, "#0b3e70");
+                context.fillStyle = ocean;
+                context.fillRect(0, 0, 1024, 512);
+
+                context.strokeStyle = "rgba(151, 226, 241, .14)";
+                context.lineWidth = 1;
+                for (let latitude = 32; latitude < 512; latitude += 32) {
+                    context.beginPath();
+                    context.moveTo(0, latitude);
+                    context.lineTo(1024, latitude);
+                    context.stroke();
+                }
+                for (let longitude = 32; longitude < 1024; longitude += 64) {
+                    context.beginPath();
+                    context.moveTo(longitude, 0);
+                    context.lineTo(longitude, 512);
+                    context.stroke();
+                }
+
+                const continents = [
+                    [[-168,70],[-145,72],[-126,57],[-123,48],[-112,48],[-103,31],[-96,26],[-81,25],[-80,9],[-91,16],[-100,20],[-106,29],[-117,33],[-123,42],[-131,51],[-145,58],[-157,60]],
+                    [[-81,12],[-70,10],[-58,5],[-49,-2],[-42,-13],[-50,-23],[-53,-34],[-65,-55],[-73,-45],[-75,-30],[-80,-14]],
+                    [[-11,71],[9,72],[27,66],[39,57],[29,51],[37,45],[26,37],[16,34],[8,43],[-1,46],[-8,56]],
+                    [[-17,36],[2,37],[18,33],[33,19],[42,8],[50,-12],[39,-27],[31,-34],[18,-35],[11,-25],[2,-16],[-6,4],[-14,15]],
+                    [[31,70],[58,69],[82,61],[105,56],[125,50],[144,57],[163,58],[179,49],[169,39],[146,39],[134,32],[122,23],[108,18],[101,7],[88,20],[79,8],[71,20],[59,25],[51,36],[43,40],[34,54]],
+                    [[112,-11],[131,-10],[145,-16],[154,-26],[147,-39],[132,-43],[115,-34],[113,-22]],
+                    [[-52,82],[-25,78],[-19,68],[-34,60],[-48,62],[-58,72]],
+                    [[-180,-72],[-125,-70],[-70,-75],[-15,-72],[40,-74],[95,-70],[150,-73],[180,-70],[180,-90],[-180,-90]]
+                ];
+                context.fillStyle = "#72a878";
+                context.strokeStyle = "rgba(190, 219, 148, .48)";
+                context.lineWidth = 2;
+                for (const polygon of continents) {
+                    context.beginPath();
+                    polygon.forEach(([longitude, latitude], index) => {
+                        const x = ((longitude + 180) / 360) * 1024;
+                        const y = ((90 - latitude) / 180) * 512;
+                        if (index === 0) context.moveTo(x, y);
+                        else context.lineTo(x, y);
+                    });
+                    context.closePath();
+                    context.fill();
+                    context.stroke();
+                }
+
+                const texture = new THREE.CanvasTexture(textureCanvas);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                return texture;
+            }
+
+            function createGlowTexture() {
+                const glowCanvas = document.createElement("canvas");
+                glowCanvas.width = 128;
+                glowCanvas.height = 128;
+                const context = glowCanvas.getContext("2d");
+                const gradient = context.createRadialGradient(64, 64, 2, 64, 64, 64);
+                gradient.addColorStop(0, "rgba(255, 225, 160, .95)");
+                gradient.addColorStop(.18, "rgba(255, 174, 76, .35)");
+                gradient.addColorStop(1, "rgba(255, 130, 45, 0)");
+                context.fillStyle = gradient;
+                context.fillRect(0, 0, 128, 128);
+                return new THREE.CanvasTexture(glowCanvas);
+            }
+
+            function addStars() {
+                const positions = [];
+                const colors = [];
+                for (let i = 0; i < 1100; i++) {
+                    const radius = 30 + Math.random() * 35;
+                    const theta = Math.random() * Math.PI * 2;
+                    const vertical = Math.random() * 2 - 1;
+                    const horizontal = Math.sqrt(1 - vertical * vertical);
+                    positions.push(
+                        radius * horizontal * Math.cos(theta),
+                        radius * vertical,
+                        radius * horizontal * Math.sin(theta)
+                    );
+                    const tint = 0.58 + Math.random() * 0.42;
+                    colors.push(tint * 0.78, tint * 0.87, tint);
+                }
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+                geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+                scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+                    size: 0.075,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.85,
+                    sizeAttenuation: true,
+                    depthWrite: false
+                })));
+            }
+        } catch (error) {
+            console.error("Could not initialize the 3D solar system:", error);
+            errorMessage.textContent = "The 3D scene could not start. Check that WebGL is enabled and that this page can load Three.js from the internet.";
+            errorMessage.style.display = "block";
+        }
+    </script>
+</body>
+</html>
